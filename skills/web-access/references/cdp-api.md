@@ -14,7 +14,9 @@
 "<node-bin>" "<skill-dir>/scripts/check-deps.mjs" --quick --browser chrome
 ```
 
-`exit 0` 继续；`exit 2` 需要选择浏览器；`exit 1` 按明确错误处理，不在同一路径反复申请授权。连接过程单次最多 8 秒，外围进程启动和健康检查另计。授权被拒绝或断线后冷却 30 秒，状态查询不触发连接；用户明确同意重新授权时，待冷却结束再试。
+`exit 0` 继续；`exit 2` 需要选择浏览器；`exit 1` 按明确错误处理，不在同一路径反复申请授权。连接过程单次默认最多等待 25 秒（给足用户点击浏览器远程调试授权弹窗的时间，可通过 `CDP_CONNECT_TIMEOUT_MS` 调整），外围进程启动和健康检查另计。授权被拒绝或断线后冷却 30 秒，状态查询不触发连接；用户明确同意重新授权时，待冷却结束再试。
+
+在 Windows 上，`check-deps.mjs` 会优先通过 WMI (`Win32_Process.Create`) 脱离父进程 Job Object 启动常驻 Proxy，防止命令执行器退出时强杀后台进程导致反复弹窗；若受沙箱限制回退到普通子进程并仍反复弹窗，可在普通 PowerShell 运行一次 `platforms/win/start-cdp-proxy.ps1` 独立常驻。
 
 配置优先使用 `~/.web-access/config.env`，旧 skill 根目录配置仅在新文件尚不存在时兼容读取。首次检查会复制旧数据，保留原件、不覆盖新位置。现有 Chrome / Chrome Canary / Chromium / Edge 选择规则及 Windows 自动选择规则保持兼容，不要求改浏览器。
 

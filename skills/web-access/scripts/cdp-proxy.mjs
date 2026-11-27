@@ -26,21 +26,46 @@ import {
 import { createProfileRouter } from './profile-selection.mjs';
 import { redactUrl } from './url-safety.mjs';
 
-// --- 解析命令行 --browser 参数（本次启动用哪个浏览器）---
-function parseBrowserArg() {
+// --- 解析命令行参数（--browser / --port / --log-file）---
+function parseCliArgs() {
   const argv = process.argv.slice(2);
+  const parsed = { browser: null, port: null, logFile: null };
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--browser' && argv[i + 1]) return argv[i + 1];
-    if (argv[i].startsWith('--browser=')) return argv[i].slice('--browser='.length);
+    const arg = argv[i];
+    if (arg === '--browser' && argv[i + 1]) parsed.browser = argv[++i];
+    else if (arg.startsWith('--browser=')) parsed.browser = arg.slice('--browser='.length);
+    else if (arg === '--port' && argv[i + 1]) parsed.port = parseInt(argv[++i], 10);
+    else if (arg.startsWith('--port=')) parsed.port = parseInt(arg.slice('--port='.length), 10);
+    else if (arg === '--log-file' && argv[i + 1]) parsed.logFile = argv[++i];
+    else if (arg.startsWith('--log-file=')) parsed.logFile = arg.slice('--log-file='.length);
   }
-  return null;
+  return parsed;
 }
-const BROWSER_OVERRIDE = parseBrowserArg();
+const CLI_ARGS = parseCliArgs();
+const BROWSER_OVERRIDE = CLI_ARGS.browser;
+
+// 当通过 Windows WMI 等脱离父进程方式启动时，无法继承父进程 fd，
+// 通过 --log-file 将日志直接追加写入本地日志文件。
+if (CLI_ARGS.logFile) {
+  try {
+    const logStream = fs.createWriteStream(CLI_ARGS.logFile, { flags: 'a', mode: 0o600 });
+    const formatArgs = (items) => items.map((x) => (typeof x === 'string' ? x : String(x))).join(' ') + '\n';
+    for (const method of ['log', 'warn', 'error']) {
+      const orig = console[method].bind(console);
+      console[method] = (...items) => {
+        try { logStream.write(formatArgs(items)); } catch { /* ignore log write errors */ }
+        orig(...items);
+      };
+    }
+  } catch { /* fallback to default stdio */ }
+}
 
 function foregroundFallbackAllowed() {
   return /^(1|true|yes|on)$/i.test(readConfigPreference('WEB_ACCESS_ALLOW_FOREGROUND_FALLBACK') || '');
 }
-const PORT = parseInt(process.env.CDP_PROXY_PORT || '3456');
+const PORT = (Number.isInteger(CLI_ARGS.port) && CLI_ARGS.port > 0 && CLI_ARGS.port < 65536)
+  ? CLI_ARGS.port
+  : parseInt(process.env.CDP_PROXY_PORT || '3456');
 const MANAGED_TABS_FILE = path.join(os.tmpdir(), `cdp-proxy-managed-tabs-${PORT}.json`);
 const RUNTIME_TOKEN = createRuntimeToken();
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -237,6 +262,8 @@ let chromeWsPath = null;
 
 let reconnectBlockedUntil = 0;
 const RECONNECT_COOLDOWN = Number(process.env.CDP_RECONNECT_COOLDOWN || 30000);
+// Chrome remote-debugging 授权弹窗需要用户切窗口点击，默认给足 25 秒避免误超时重连
+const CONNECT_TIMEOUT_MS = Number(process.env.CDP_CONNECT_TIMEOUT_MS || 25000);
 const profiles = createProfileRouter({
   sendCDP, ensureSession, managedTabs, registerManagedTarget, closeManagedTargets,
   forgetSession, touchTab, persistManagedTabs, readConfigPreference,
@@ -245,6 +272,7 @@ const profiles = createProfileRouter({
 const pageFrames = createPageFrames({ send: sendCDP, ensureSession });
 const connection = createCdpConnection({
   WebSocketImpl: WS,
+  connectTimeoutMs: CONNECT_TIMEOUT_MS,
   discoverUrl: async () => {
     if (Date.now() < reconnectBlockedUntil) {
       throw new Error(`CDP 刚断开或授权被拒绝，${Math.ceil((reconnectBlockedUntil - Date.now()) / 1000)} 秒后再试`);

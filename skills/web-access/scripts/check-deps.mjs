@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Only run on a selected local-browser path. Imports and static reads never connect.
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,15 +11,90 @@ import { migrateLegacyData, readConfigPreference, userDataPaths } from './user-d
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.CDP_PROXY_PORT || 3456);
-const opts = { quick: false, browser: null };
-for (let i = 2; i < process.argv.length; i++) {
-  const arg = process.argv[i];
-  if (arg === '--quick') opts.quick = true;
-  else if (arg === '--browser') {
-    if (!process.argv[i + 1]) throw new Error('参数 --browser 缺少浏览器名称');
-    opts.browser = process.argv[++i];
-  } else if (arg.startsWith('--browser=')) opts.browser = arg.slice(10);
-  else throw new Error(`未知参数：${arg}`);
+
+export function quoteWindowsArg(value) {
+  const str = String(value);
+  if (!str) return '""';
+  if (!/[\s"&|<>^()]/.test(str)) return str;
+  // Standard Windows CreateProcess quoting: double backslashes before a quote or end-of-string
+  return '"' + str.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, '$1$1') + '"';
+}
+
+export function buildWindowsProxyCommandLine(execPath, scriptPath, { browser = null, port = 3456, logFile = null } = {}) {
+  const args = [execPath, scriptPath];
+  if (browser) {
+    if (!/^[a-z0-9-]+$/i.test(browser)) throw new Error(`非法浏览器标识：${browser}`);
+    args.push('--browser', browser);
+  }
+  if (Number.isInteger(port) && port > 0 && port < 65536 && port !== 3456) {
+    args.push('--port', String(port));
+  }
+  if (logFile) {
+    args.push('--log-file', logFile);
+  }
+  return args.map(quoteWindowsArg).join(' ');
+}
+
+function tryStartProxyViaWindowsWmi(browser, logPath) {
+  if (process.platform !== 'win32' || process.env.WEB_ACCESS_DISABLE_WMI_DETACH === '1') {
+    return false;
+  }
+  // Win32_Process.Create spawns under WmiPrvSE.exe so the proxy survives parent Windows Job Object teardown
+  // (e.g., Codex / Antigravity command runners that terminate child trees when a command exits).
+  const cmdLine = buildWindowsProxyCommandLine(
+    process.execPath,
+    path.join(ROOT, 'scripts', 'cdp-proxy.mjs'),
+    { browser, port: PORT, logFile: logPath },
+  );
+  const psScript = [
+    '$ErrorActionPreference = "Stop"',
+    '$si = New-CimInstance -ClassName Win32_ProcessStartup -Property @{ ShowWindow = [uint16]0 } -ClientOnly',
+    '$res = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $env:WEB_ACCESS_PROXY_CMD; ProcessStartupInformation = $si }',
+    'if ($res.ReturnValue -ne 0) { exit ([int]$res.ReturnValue) }',
+  ].join('; ');
+  try {
+    const res = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', psScript], {
+      env: { ...process.env, WEB_ACCESS_PROXY_CMD: cmdLine },
+      stdio: 'ignore',
+      windowsHide: true,
+      timeout: 5000,
+    });
+    return res.status === 0;
+  } catch {
+    return false;
+  }
+}
+
+function startProxy(browser) {
+  const log = path.join(os.tmpdir(), 'cdp-proxy.log');
+  if (tryStartProxyViaWindowsWmi(browser, log)) {
+    return 'win32-wmi';
+  }
+  const fd = fs.openSync(log, 'a', 0o600);
+  if (process.platform !== 'win32') fs.chmodSync(log, 0o600);
+  try {
+    const args = [path.join(ROOT, 'scripts', 'cdp-proxy.mjs')];
+    if (browser) args.push('--browser', browser);
+    const child = spawn(process.execPath, args, {
+      detached: true, stdio: ['ignore', fd, fd], windowsHide: true,
+    });
+    child.unref();
+  } finally { fs.closeSync(fd); }
+  return 'spawn-detached';
+}
+
+function parseArgs(argv) {
+  const opts = { quick: false, browser: null };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === '--quick') opts.quick = true;
+    else if (arg === '--browser') {
+      if (!argv[i + 1]) throw new Error('参数 --browser 缺少浏览器名称');
+      opts.browser = argv[++i];
+    } else if (arg.startsWith('--browser=')) opts.browser = arg.slice(10);
+    else throw new Error(`未知参数：${arg}`);
+  }
+  return opts;
 }
 
 async function request(endpoint, { method = 'GET', timeout = 1000 } = {}) {
@@ -40,7 +115,7 @@ function parseConfiguredPort(rawPort) {
   return port > 0 && port < 65536 ? port : null;
 }
 
-function compatible(health) {
+function compatible(health, opts) {
   if (health.maintenance) throw new Error('共享服务正在维护，请稍后重试；保留现有实例');
   const expected = opts.browser || readConfigPreference('WEB_ACCESS_BROWSER');
   const fixedPort = !opts.browser ? parseConfiguredPort(readConfigPreference('WEB_ACCESS_DEBUG_PORT')) : null;
@@ -52,21 +127,7 @@ function compatible(health) {
   }
 }
 
-function startProxy(browser) {
-  const log = path.join(os.tmpdir(), 'cdp-proxy.log');
-  const fd = fs.openSync(log, 'a', 0o600);
-  if (process.platform !== 'win32') fs.chmodSync(log, 0o600);
-  try {
-    const args = [path.join(ROOT, 'scripts', 'cdp-proxy.mjs')];
-    if (browser) args.push('--browser', browser);
-    const child = spawn(process.execPath, args, {
-      detached: true, stdio: ['ignore', fd, fd], windowsHide: true,
-    });
-    child.unref();
-  } finally { fs.closeSync(fd); }
-}
-
-async function resolveBrowser() {
+async function resolveBrowser(opts) {
   const result = await selectBrowser(opts.browser);
   if (result.kind === 'ok') return result.browser.id === 'unknown' ? null : result.browser.id;
   if (result.kind === 'ambiguous') {
@@ -86,6 +147,7 @@ async function resolveBrowser() {
 }
 
 async function main() {
+  const opts = parseArgs(process.argv.slice(2));
   if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('需要 Node.js 22+');
   if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error('无效的 Proxy 端口');
   // Migration copies only; a failed migration must not create a default config over old preferences.
@@ -98,8 +160,10 @@ async function main() {
     if (process.platform !== 'win32') fs.chmodSync(data.config, 0o600);
   }
   let health = await request('/health');
+  let launchMode = null;
+  const hadStaleState = !health?.ok && Boolean(readRuntimeState(PORT));
   if (health?.ok && health.data.status === 'ok') {
-    compatible(health.data);
+    compatible(health.data, opts);
   } else {
     // Detect an unauthenticated legacy service without borrowing its session or replacing it.
     try {
@@ -107,28 +171,43 @@ async function main() {
       const legacy = await response.json();
       if (response.ok && legacy.status === 'ok') throw new Error('当前端口是未认证的旧服务；请先查看维护迁移说明，不自动替换');
     } catch (error) { if (error.message.includes('未认证的旧服务')) throw error; }
-    const browser = await resolveBrowser();
+    const browser = await resolveBrowser(opts);
     if (browser === undefined) return;
-    startProxy(opts.browser || browser);
-    const deadline = Date.now() + 2500;
+    launchMode = startProxy(opts.browser || browser);
+    const deadline = Date.now() + (launchMode === 'win32-wmi' ? 5000 : 2500);
     do {
       await new Promise(resolve => setTimeout(resolve, 100));
       health = await request('/health');
     } while (!health?.ok && Date.now() < deadline);
     if (!health?.ok) throw new Error('Proxy 未及时启动；保留运行记录，不重复启动或终止其它服务');
-    compatible(health.data);
+    compatible(health.data, opts);
   }
   if (!health.data.connected) {
-    // One connection request only; the service shares discovery and handshake among callers.
-    const connected = await request('/connect', { method: 'POST', timeout: opts.quick ? 8500 : 20000 });
+    // One connection request only; allow 26s+ for user to click Chrome remote-debugging prompt.
+    const connected = await request('/connect', { method: 'POST', timeout: opts.quick ? 26000 : 30000 });
     if (!connected?.ok) throw new Error(connected?.data?.error || 'CDP 未及时就绪；本次不重复申请授权');
   }
   const probe = await request('/probe', { method: 'POST', timeout: opts.quick ? 3000 : 8000 });
   if (!probe?.ok) throw new Error(probe?.data?.error || '实时 CDP 检查失败；Profile 识别仍延迟至创建任务页');
   health = await request('/health');
   if (!health?.ok || !health.data.connected) throw new Error('Proxy 运行但浏览器连接不可用');
-  compatible(health.data);
+  compatible(health.data, opts);
   console.log(`proxy: ready (${health.data.browser?.label || '本地浏览器'}, connection checked, Profile deferred)`);
+  if (process.platform === 'win32' && hadStaleState && launchMode === 'spawn-detached') {
+    console.log('proxy: 检测到上次后台进程在 Windows 环境中被外部终止且 WMI 脱离未启用；若仍反复弹出 CDP 授权，请在普通 PowerShell 运行 platforms/win/start-cdp-proxy.ps1 常驻一次');
+  }
   if (!health.data.instanceId) console.log('proxy: 仍在运行旧代码；空闲时使用维护命令完成一次性升级');
 }
-main().catch(error => { console.error(error.message); process.exitCode = 1; });
+
+function isCliEntry() {
+  if (!process.argv[1]) return false;
+  try {
+    return fs.realpathSync(path.resolve(process.argv[1])) === fs.realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+  }
+}
+
+if (isCliEntry()) {
+  main().catch(error => { console.error(error.message); process.exitCode = 1; });
+}

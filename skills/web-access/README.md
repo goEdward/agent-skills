@@ -31,6 +31,7 @@
 ## 依赖与测试
 
 - Node.js 22+（仅使用标准库，零 `npm install` 依赖）
+- **Windows 防重复弹出 CDP 授权**：`check-deps.mjs` 在 Windows 下优先通过 WMI (`Win32_Process.Create`) 脱离命令执行器 Job Object 启动常驻 Proxy，并将首次授权等待超时放宽至 25 秒。若本地沙箱限制 WMI 导致仍重复弹窗，在普通 PowerShell 运行一次 `platforms/win/start-cdp-proxy.ps1` 常驻即可（停止用 `platforms/win/stop-cdp-proxy.ps1`）。
 - 运行单元测试：
   ```bash
   node --test scripts/*.test.mjs
