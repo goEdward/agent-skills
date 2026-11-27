@@ -28,7 +28,8 @@
 ## 3. Public 仓库安全底线
 
 - **绝不提交任何隐私信息**：包括 API Key、Token、Cookie、个人邮箱、本机绝对路径、客户/店铺/公司内部信息。
-- **隐私物理隔离**：本地隐私配置统一放在 `~/.config/agent-secrets/<skill-name>.env`，仓库内只放 `templates/config.example.env`。
+- **隐私物理隔离**：本地隐私配置统一放在仓库外部（如 `~/.config/agent-secrets/<skill-name>/...`、`~/.web-access/config.env`），仓库内只放 `templates/` 模板。
+- **更新严禁覆盖本地隐私文件**：无论是用户拉取更新，还是 AI 协助安装/升级本仓库，**严禁删除、清空或用 `templates/` 覆盖任何已存在的仓库外本地隐私/配置文件**；仅在文件不存在时允许从模板初始化（`setup.py --init-secrets`）。
 - **推送前必须安检**：任何推送到 GitHub 的操作，必须先运行 `sync_tool.py doctor` 和 `sync_tool.py audit`，向用户展示变更清单与确认结果后才能执行 `git push`。
 
 ## 4. 新增或删除 Skill 后的挂载刷新

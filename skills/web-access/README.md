@@ -21,7 +21,9 @@
 - **macOS / Linux**：`~/.web-access/config.env`
 - **Windows**：`%USERPROFILE%\.web-access\config.env`
 
-新设备部署时，将 `templates/config.env.template` 复制到 `~/.web-access/config.env` 按本机浏览器实际路径填写即可。个人私密站点经验可放 `~/.web-access/site-patterns/`（同名优先于仓库内置经验）。
+新设备部署时，可运行仓库根目录的 `python3 setup.py --user --only web-access --init-secrets`（仅在 `~/.web-access/config.env` **不存在**时由 `templates/config.env.template` 创建），再按本机浏览器实际路径填写。个人私密站点经验可放 `~/.web-access/site-patterns/`（同名优先于仓库内置经验）。
+
+> **⚠️ 更新安全声明**：`git pull` 与 `setup.py`（含 `--init-secrets`）**绝不会覆盖已存在的 `~/.web-access/config.env` 或个人 `site-patterns/`**。AI 协助更新时也严禁以模板覆盖这些本地文件。
 
 ## 依赖与测试
 
