@@ -1,0 +1,7 @@
+interface:
+  display_name: "Amazon Ads Profit Optimizer"
+  short_description: "Analyze bids, mature growth, and product targeting"
+  default_prompt: "Use $amazon-ads-optimizer with the supplied reports, default to rebuild unless I ask to optimize live campaigns, preserve the generated three-section draft, audit only semantic negative safety, and link the full report."
+
+policy:
+  allow_implicit_invocation: false

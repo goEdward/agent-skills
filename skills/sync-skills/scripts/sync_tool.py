@@ -36,6 +36,7 @@ FORBIDDEN_FILENAME_PATTERNS = [
 ALLOWED_FILENAME_EXCEPTIONS = [
     re.compile(r"(^|/)\.env\.example$", re.IGNORECASE),
     re.compile(r"\.example\.env$", re.IGNORECASE),
+    re.compile(r"\.env\.template$", re.IGNORECASE),
     re.compile(r"(^|/)config\.example\.[^/]+$", re.IGNORECASE),
 ]
 
@@ -67,6 +68,7 @@ PLACEHOLDER_USERS = {
     "bob",
     "name",
     "me",
+    "test",
 }
 
 SAFE_EMAIL_DOMAINS = {

@@ -1,0 +1,20 @@
+{
+  "output": {
+    "section_count": 3
+  },
+  "negative": {
+    "early_review_clicks": 3,
+    "direct_clicks": 6,
+    "direct_profit_spend_multiple": 1.0,
+    "relevant_query_expected_orders": 1.5,
+    "relevant_query_profit_spend_multiple": 1.5
+  },
+  "zero_order_discovery": {
+    "max_with_conversions": 2,
+    "max_without_conversions": 5
+  },
+  "placement": {
+    "default_uplift_pct": 30,
+    "fallback_divisor": 1.3
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "products": [
+    {
+      "key": "example-us-widget",
+      "asin": "B0EXAMPLE1",
+      "sku": "SKU-EXAMPLE-001",
+      "aliases": [
+        "example-widget",
+        "B0EXAMPLE2"
+      ],
+      "marketplace_default": "US",
+      "target_acos": "30%",
+      "average_order_value": "29.99",
+      "gross_margin_range": "28-35%",
+      "baseline_cvr": "12%",
+      "lifecycle_stage": "growth",
+      "title": "Example Widget Product Title",
+      "core_category": "Example Category",
+      "compatibility": [
+        "Model A",
+        "Model B"
+      ],
+      "key_attributes": [
+        "Waterproof",
+        "Lightweight"
+      ],
+      "target_audience": "General consumers",
+      "description": "Synthetic placeholder record for template reference only."
+    }
+  ]
+}

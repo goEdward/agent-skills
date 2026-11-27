@@ -86,6 +86,10 @@ python3 <your-local-dir>/setup.py --status
 
 ## 已收录 Skill
 
-| Skill | 作用 | 支持 Agent | 支持系统 |
+| Skill | 作用 | 适配方式 | 本地隐私配置文件（仓库外） |
 | :--- | :--- | :--- | :--- |
-| [`sync-skills`](./skills/sync-skills/README.md) | 自检全局规则、校验 Skill 规范、扫描隐私防泄露并安全同步至 GitHub | Antigravity / Codex / Claude | macOS / Windows |
+| [`sync-skills`](./skills/sync-skills/README.md) | 自检全局规则、校验规范、隐私扫描并安全同步至 GitHub | 通用 1 份（Antigravity / Codex / Claude） | `~/.config/agent-secrets/sync-skills.env`（可选） |
+| [`listing-generation`](./skills/listing-generation/README.md) | Amazon US/DE Listing 生成与 2026-07-27 规则确定性校验 | 通用 1 份（Win/Mac · Python 标准库） | 无 |
+| [`amazon-st-search-terms`](./skills/amazon-st-search-terms/README.md) | Amazon 后台 Search Terms 生成与 250-byte 严格裁剪 | 通用 1 份（Win/Mac · Python 标准库） | 无 |
+| [`amazon-ads-optimizer`](./skills/amazon-ads-optimizer/README.md) | Amazon US/DE 广告搜索词报表分析与重建规划 | 通用 1 份（Win/Mac · Python 3.10+） | `~/.config/agent-secrets/amazon-ads-optimizer/products.json` |
+| [`web-access`](./skills/web-access/README.md) | 联网研究、事实核实、静态抓取与外部浏览器 CDP 自动化 | 共享 `scripts/` + `agents/{antigravity,codex}/` 差异层（Node 22+） | `~/.web-access/config.env` |

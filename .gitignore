@@ -22,9 +22,12 @@ node_modules/
 !.env.example
 !*.example.env
 !config.example.*
+!*.env.template
 *.local.*
 *.secret.*
 secrets/
+skills/amazon-ads-optimizer/references/products.json
+skills/web-access/config.env
 *.pem
 *.key
 *.p12

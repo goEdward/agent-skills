@@ -26,7 +26,7 @@ LOCAL_VIEWS_DIR = REPO_ROOT / ".local-views"
 ANTIGRAVITY_CONFIG_DIR = Path.home() / ".gemini" / "config"
 ANTIGRAVITY_SKILLS_JSON = ANTIGRAVITY_CONFIG_DIR / "skills.json"
 ANTIGRAVITY_RULES_DIR = ANTIGRAVITY_CONFIG_DIR / "rules"
-ANTIGRAVITY_RULE_DST = ANTIGRAVITY_RULES_DIR / "skills-management.md"
+ANTIGRAVITY_PLUGINS_DIR = ANTIGRAVITY_CONFIG_DIR / "plugins"
 
 CODEX_DIR = Path.home() / ".codex"
 CODEX_SKILLS_DIR = CODEX_DIR / "skills"
@@ -72,11 +72,24 @@ def discover_skills() -> list[dict[str, Any]]:
         if not main_md.is_file():
             continue
         overrides: dict[str, Path] = {}
+        agent_rules: dict[str, list[Path]] = {}
         for agent_name in ("antigravity", "codex", "claude"):
             override_dir = sub / "agents" / agent_name
             if (override_dir / "SKILL.md").is_file():
                 overrides[agent_name] = override_dir
-        items.append({"name": sub.name, "root": sub, "overrides": overrides})
+            rules_sub = override_dir / "rules"
+            if rules_sub.is_dir():
+                md_files = sorted(p for p in rules_sub.glob("*.md") if p.is_file())
+                if md_files:
+                    agent_rules[agent_name] = md_files
+        items.append(
+            {
+                "name": sub.name,
+                "root": sub,
+                "overrides": overrides,
+                "agentRules": agent_rules,
+            }
+        )
     return items
 
 
@@ -132,6 +145,94 @@ def create_dir_link(src: Path, dst: Path, dry_run: bool) -> None:
         os.symlink(src, dst)
 
 
+def link_or_copy_file(src: Path, dst: Path) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.exists() or dst.is_symlink():
+        dst.unlink()
+    if platform.system() == "Windows":
+        try:
+            os.symlink(src, dst)
+            return
+        except OSError:
+            shutil.copy2(src, dst)
+            return
+    os.symlink(src, dst)
+
+
+def merge_directory_view(base_dir: Path, override_dir: Path, dst_dir: Path) -> None:
+    """Create a merged view directory where override_dir files take precedence over base_dir."""
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    names: set[str] = set()
+    if base_dir.is_dir():
+        names.update(p.name for p in base_dir.iterdir() if p.name != ".DS_Store")
+    if override_dir.is_dir():
+        names.update(p.name for p in override_dir.iterdir() if p.name != ".DS_Store")
+
+    for name in sorted(names):
+        b_item = base_dir / name if base_dir.is_dir() else None
+        o_item = override_dir / name if override_dir.is_dir() else None
+        b_exists = bool(b_item and b_item.exists())
+        o_exists = bool(o_item and o_item.exists())
+
+        if o_exists and o_item is not None:
+            if o_item.is_dir():
+                if b_exists and b_item is not None and b_item.is_dir():
+                    merge_directory_view(b_item, o_item, dst_dir / name)
+                else:
+                    create_dir_link(o_item, dst_dir / name, dry_run=False)
+            else:
+                link_or_copy_file(o_item, dst_dir / name)
+        elif b_exists and b_item is not None:
+            if b_item.is_dir():
+                create_dir_link(b_item, dst_dir / name, dry_run=False)
+            else:
+                link_or_copy_file(b_item, dst_dir / name)
+
+
+def build_agent_override_view(skill: dict[str, Any], agent_name: str, dry_run: bool) -> Path:
+    """Build a composed view under .local-views/<agent>/<skill> merging shared assets with agent overrides."""
+    view_skill_dir = LOCAL_VIEWS_DIR / agent_name / skill["name"]
+    if dry_run:
+        return view_skill_dir
+
+    if view_skill_dir.exists() or view_skill_dir.is_symlink():
+        if is_reparse_or_symlink(view_skill_dir):
+            remove_link(view_skill_dir)
+        else:
+            shutil.rmtree(view_skill_dir)
+    view_skill_dir.mkdir(parents=True, exist_ok=True)
+
+    root: Path = skill["root"]
+    override_dir: Path = skill["overrides"][agent_name]
+
+    # 1. Override SKILL.md
+    link_or_copy_file(override_dir / "SKILL.md", view_skill_dir / "SKILL.md")
+
+    # 2. Shared root files (README.md, skill.manifest.json, etc.) unless overridden
+    for fname in ("README.md", "skill.manifest.json"):
+        if (override_dir / fname).is_file():
+            link_or_copy_file(override_dir / fname, view_skill_dir / fname)
+        elif (root / fname).is_file():
+            link_or_copy_file(root / fname, view_skill_dir / fname)
+
+    # 3. Shared directories (scripts, templates, references, tests) merged with overrides
+    for dirname in ("scripts", "templates", "references", "tests"):
+        base_sub = root / dirname
+        over_sub = override_dir / dirname
+        if over_sub.is_dir() and base_sub.is_dir():
+            merge_directory_view(base_sub, over_sub, view_skill_dir / dirname)
+        elif over_sub.is_dir():
+            create_dir_link(over_sub, view_skill_dir / dirname, dry_run=False)
+        elif base_sub.is_dir():
+            create_dir_link(base_sub, view_skill_dir / dirname, dry_run=False)
+
+    # 4. Codex openai.yaml metadata if present
+    if agent_name == "codex" and (override_dir / "openai.yaml").is_file():
+        link_or_copy_file(override_dir / "openai.yaml", view_skill_dir / "agents" / "openai.yaml")
+
+    return view_skill_dir
+
+
 def mount_link_based_agent(
     agent_name: str,
     target_dir: Path,
@@ -141,18 +242,20 @@ def mount_link_based_agent(
     uninstall: bool,
 ) -> None:
     print(f"\n[{agent_name}:skills] Target directory: {target_dir}")
+    view_agent_root = LOCAL_VIEWS_DIR / agent_name
+
     if uninstall:
-        if not target_dir.is_dir():
-            print("  Nothing to uninstall.")
-            return
-        removed = 0
-        for child in sorted(target_dir.iterdir()):
-            if points_into_repo(child):
-                print(f"  Removing link: {child.name}")
-                if not dry_run:
-                    remove_link(child)
-                removed += 1
-        print(f"  Removed {removed} managed link(s).")
+        if target_dir.is_dir():
+            removed = 0
+            for child in sorted(target_dir.iterdir()):
+                if points_into_repo(child):
+                    print(f"  Removing link: {child.name}")
+                    if not dry_run:
+                        remove_link(child)
+                    removed += 1
+            print(f"  Removed {removed} managed link(s).")
+        if view_agent_root.exists() and not dry_run:
+            shutil.rmtree(view_agent_root)
         return
 
     desired_names = {s["name"] for s in skills}
@@ -165,23 +268,28 @@ def mount_link_based_agent(
 
     for skill in skills:
         name = skill["name"]
-        src: Path = skill["overrides"].get(agent_name, skill["root"])
+        if agent_name in skill["overrides"]:
+            src = build_agent_override_view(skill, agent_name, dry_run=dry_run)
+            src_label = f".local-views/{agent_name}/{name} (merged override)"
+        else:
+            src = skill["root"]
+            src_label = src.relative_to(REPO_ROOT).as_posix()
         dst = target_dir / name
 
         if dst.exists() or dst.is_symlink():
             if points_into_repo(dst):
                 try:
-                    if dst.resolve() == src.resolve():
-                        print(f"  OK       {name} -> {src.relative_to(REPO_ROOT).as_posix()}")
+                    if not dry_run and dst.resolve() == src.resolve():
+                        print(f"  OK       {name} -> {src_label}")
                         continue
                 except OSError:
                     pass
-                print(f"  Updating {name} -> {src.relative_to(REPO_ROOT).as_posix()}")
+                print(f"  Updating {name} -> {src_label}")
                 if not dry_run:
                     remove_link(dst)
                 create_dir_link(src, dst, dry_run=dry_run)
             elif force:
-                print(f"  Replacing (--force) {name} -> {src.relative_to(REPO_ROOT).as_posix()}")
+                print(f"  Replacing (--force) {name} -> {src_label}")
                 if not dry_run:
                     if is_reparse_or_symlink(dst):
                         remove_link(dst)
@@ -196,7 +304,7 @@ def mount_link_based_agent(
                     f"(use --force to replace)"
                 )
         else:
-            print(f"  Mounting {name} -> {src.relative_to(REPO_ROOT).as_posix()}")
+            print(f"  Mounting {name} -> {src_label}")
             create_dir_link(src, dst, dry_run=dry_run)
 
 
@@ -252,13 +360,13 @@ def mount_antigravity_skills(skills: list[dict[str, Any]], dry_run: bool, uninst
 
     if overrides:
         override_names = [s["name"] for s in overrides]
-        print(f"  Preparing agent-specific overrides: {', '.join(override_names)}")
+        print(f"  Building merged override views for: {', '.join(override_names)}")
         if not dry_run:
             if view_dir.exists():
                 shutil.rmtree(view_dir)
             view_dir.mkdir(parents=True, exist_ok=True)
             for s in overrides:
-                create_dir_link(s["overrides"]["antigravity"], view_dir / s["name"], dry_run=False)
+                build_agent_override_view(s, "antigravity", dry_run=False)
         new_entries.append({"path": view_portable})
         new_entries.append({"path": main_portable, "exclude": override_names})
     else:
@@ -271,6 +379,15 @@ def mount_antigravity_skills(skills: list[dict[str, Any]], dry_run: bool, uninst
     if overrides:
         print(f"  Registered override view: {view_portable}")
 
+    # Warn if legacy local plugins share the same skill names
+    for s in skills:
+        legacy_plugin = ANTIGRAVITY_PLUGINS_DIR / s["name"]
+        if legacy_plugin.is_dir():
+            print(
+                f"  NOTE     legacy Antigravity plugin also exists at {legacy_plugin}; "
+                f"you can disable/uninstall it in Customizations to avoid duplicates."
+            )
+
     if not dry_run:
         ANTIGRAVITY_SKILLS_JSON.parent.mkdir(parents=True, exist_ok=True)
         ANTIGRAVITY_SKILLS_JSON.write_text(
@@ -278,51 +395,57 @@ def mount_antigravity_skills(skills: list[dict[str, Any]], dry_run: bool, uninst
         )
 
 
-def sync_antigravity_rule(dry_run: bool, uninstall: bool) -> None:
-    print(f"\n[antigravity:rule] Target: {ANTIGRAVITY_RULE_DST}")
+def collect_antigravity_rule_sources(skills: list[dict[str, Any]]) -> list[tuple[str, Path]]:
+    """Collect global repo rules and per-skill Antigravity rules."""
+    sources: list[tuple[str, Path]] = []
+    if RULES_DIR.is_dir():
+        for md in sorted(RULES_DIR.glob("*.md")):
+            if md.is_file():
+                sources.append((md.name, md))
+    for s in skills:
+        for md in s["agentRules"].get("antigravity", []):
+            sources.append((md.name, md))
+    return sources
+
+
+def sync_antigravity_rules(skills: list[dict[str, Any]], dry_run: bool, uninstall: bool) -> None:
+    print(f"\n[antigravity:rules] Target directory: {ANTIGRAVITY_RULES_DIR}")
+    sources = collect_antigravity_rule_sources(skills)
+
     if uninstall:
-        if ANTIGRAVITY_RULE_DST.is_symlink() or ANTIGRAVITY_RULE_DST.is_file():
-            if points_into_repo(ANTIGRAVITY_RULE_DST) or ANTIGRAVITY_RULE_DST.is_file():
-                print("  Removing skills-management.md")
-                if not dry_run:
-                    ANTIGRAVITY_RULE_DST.unlink()
-        else:
+        if not ANTIGRAVITY_RULES_DIR.is_dir():
             print("  Nothing to uninstall.")
-        return
-
-    if not SKILL_MGMT_RULE_SRC.is_file():
-        print(f"  SKIP: template missing at {SKILL_MGMT_RULE_SRC}")
-        return
-
-    if dry_run:
-        print(f"  [dry-run] sync {ANTIGRAVITY_RULE_DST} <- {SKILL_MGMT_RULE_SRC}")
-        return
-
-    ANTIGRAVITY_RULES_DIR.mkdir(parents=True, exist_ok=True)
-    if ANTIGRAVITY_RULE_DST.is_symlink():
-        try:
-            if ANTIGRAVITY_RULE_DST.resolve() == SKILL_MGMT_RULE_SRC.resolve():
-                print("  OK       linked to repository rule template")
-                return
-        except OSError:
-            pass
-        ANTIGRAVITY_RULE_DST.unlink()
-    elif ANTIGRAVITY_RULE_DST.exists():
-        # Overwrite only if managed copy or identical; replace with symlink/copy
-        ANTIGRAVITY_RULE_DST.unlink()
-
-    if platform.system() == "Windows":
-        try:
-            os.symlink(SKILL_MGMT_RULE_SRC, ANTIGRAVITY_RULE_DST)
-            print("  Linked   skills-management.md -> rules/skills-management.md")
             return
-        except OSError:
-            shutil.copyfile(SKILL_MGMT_RULE_SRC, ANTIGRAVITY_RULE_DST)
-            print("  Copied   rules/skills-management.md (Windows symlink fallback)")
-            return
-    else:
-        os.symlink(SKILL_MGMT_RULE_SRC, ANTIGRAVITY_RULE_DST)
-        print("  Linked   skills-management.md -> rules/skills-management.md")
+        removed = 0
+        for child in sorted(ANTIGRAVITY_RULES_DIR.iterdir()):
+            if points_into_repo(child):
+                print(f"  Removing rule link: {child.name}")
+                if not dry_run:
+                    child.unlink()
+                removed += 1
+        print(f"  Removed {removed} managed rule(s).")
+        return
+
+    if not dry_run:
+        ANTIGRAVITY_RULES_DIR.mkdir(parents=True, exist_ok=True)
+
+    for filename, src in sources:
+        dst = ANTIGRAVITY_RULES_DIR / filename
+        if dry_run:
+            print(f"  [dry-run] sync {dst} <- {src.relative_to(REPO_ROOT).as_posix()}")
+            continue
+        if dst.is_symlink():
+            try:
+                if dst.resolve() == src.resolve():
+                    print(f"  OK       {filename}")
+                    continue
+            except OSError:
+                pass
+            dst.unlink()
+        elif dst.exists():
+            dst.unlink()
+        link_or_copy_file(src, dst)
+        print(f"  Linked   {filename} -> {src.relative_to(REPO_ROOT).as_posix()}")
 
 
 def sync_codex_rule(dry_run: bool, uninstall: bool) -> None:
@@ -356,7 +479,7 @@ def sync_codex_rule(dry_run: bool, uninstall: bool) -> None:
     managed_block = f"{MANAGED_BLOCK_START}\n{body}\n{MANAGED_BLOCK_END}"
 
     if block_re.search(existing):
-        updated = block_re.sub(managed_block, existing)
+        updated = block_re.sub(lambda _: managed_block, existing)
         if updated == existing:
             print("  OK       managed block already up to date")
             return
@@ -378,7 +501,9 @@ def print_status(skills: list[dict[str, Any]]) -> None:
     print(f"Skills ({len(skills)}):")
     for s in skills:
         ov = ", ".join(sorted(s["overrides"].keys())) or "none (shared SKILL.md)"
-        print(f"  - {s['name']} (agent overrides: {ov})")
+        rules_info = ", ".join(sorted(s["agentRules"].keys()))
+        extra = f", rules: {rules_info}" if rules_info else ""
+        print(f"  - {s['name']} (agent overrides: {ov}{extra})")
 
     agy_mounted = False
     if ANTIGRAVITY_SKILLS_JSON.is_file():
@@ -392,7 +517,10 @@ def print_status(skills: list[dict[str, Any]]) -> None:
             agy_mounted = SKILLS_DIR.resolve().as_posix() in norms
         except Exception:
             agy_mounted = False
-    agy_rule_ok = ANTIGRAVITY_RULE_DST.is_file() or ANTIGRAVITY_RULE_DST.is_symlink()
+    rule_sources = collect_antigravity_rule_sources(skills)
+    agy_rules_ok = sum(
+        1 for fname, _ in rule_sources if (ANTIGRAVITY_RULES_DIR / fname).exists()
+    )
 
     codex_links = [s["name"] for s in skills if points_into_repo(CODEX_SKILLS_DIR / s["name"])]
     codex_rule_ok = (
@@ -402,7 +530,7 @@ def print_status(skills: list[dict[str, Any]]) -> None:
 
     print(
         f"\nAntigravity: skills={'MOUNTED' if agy_mounted else 'MISSING'}, "
-        f"rule={'INSTALLED' if agy_rule_ok else 'MISSING'} ({ANTIGRAVITY_RULE_DST})"
+        f"rules={agy_rules_ok}/{len(rule_sources)} installed ({ANTIGRAVITY_RULES_DIR})"
     )
     print(
         f"Codex:       skills={len(codex_links)}/{len(skills)} mounted, "
@@ -414,7 +542,7 @@ def print_status(skills: list[dict[str, Any]]) -> None:
         ]
         print(f"Claude Code: skills={len(claude_links)}/{len(skills)} mounted ({CLAUDE_SKILLS_DIR})")
     else:
-        print(f"Claude Code: not installed (skipped)")
+        print("Claude Code: not installed (skipped)")
 
 
 def main() -> int:
@@ -465,7 +593,7 @@ def main() -> int:
 
     if not args.no_rules:
         if args.agent in ("all", "antigravity"):
-            sync_antigravity_rule(dry_run=args.dry_run, uninstall=args.uninstall)
+            sync_antigravity_rules(skills, dry_run=args.dry_run, uninstall=args.uninstall)
         if args.agent in ("all", "codex"):
             sync_codex_rule(dry_run=args.dry_run, uninstall=args.uninstall)
 

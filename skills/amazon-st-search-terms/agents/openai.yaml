@@ -1,0 +1,7 @@
+interface:
+  display_name: "Amazon ST Search Terms"
+  short_description: "为指定 Amazon 站点生成并校验后台 Search Terms"
+  default_prompt: "Use $amazon-st-search-terms to generate Amazon backend Search Terms for my target marketplace from my title, bullet points, and pasted competitor search-term data."
+
+policy:
+  allow_implicit_invocation: false

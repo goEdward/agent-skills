@@ -1,0 +1,15 @@
+{
+  "name": "amazon-ads-optimizer",
+  "version": "1.0.0",
+  "description": "Amazon US/DE Ads search-term analyzer, semantic negative auditor, and rebuild planner with external private product DB.",
+  "agents": ["antigravity", "codex", "claude"],
+  "platforms": ["mac", "win", "linux"],
+  "entry": "SKILL.md",
+  "agentOverrides": {
+    "antigravity": "agents/antigravity/SKILL.md",
+    "codex": "agents/codex/SKILL.md",
+    "claude": "agents/claude/SKILL.md"
+  },
+  "localSecretsTemplate": "templates/products.example.json",
+  "localSecretsTarget": "~/.config/agent-secrets/amazon-ads-optimizer/products.json"
+}
