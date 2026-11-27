@@ -2,12 +2,22 @@
   "name": "listing-generation",
   "version": "1.0.0",
   "description": "Amazon US/DE Listing generator and deterministic policy validator (2026-07-27 Title & Item Highlights rules).",
-  "agents": ["antigravity", "codex", "claude"],
-  "platforms": ["mac", "win", "linux"],
+  "agents": [
+    "antigravity",
+    "codex",
+    "claude"
+  ],
+  "platforms": [
+    "mac",
+    "win",
+    "linux"
+  ],
   "entry": "SKILL.md",
   "agentOverrides": {
     "antigravity": "agents/antigravity/SKILL.md",
     "codex": "agents/codex/SKILL.md",
     "claude": "agents/claude/SKILL.md"
-  }
+  },
+  "repository": "https://github.com/goEdward/agent-skills",
+  "sourcePath": "skills/listing-generation"
 }

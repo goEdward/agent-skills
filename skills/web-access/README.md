@@ -1,5 +1,8 @@
 # web-access（跨平台 · Antigravity & Codex 适配版 2.9.1）
 
+> **源仓库**：https://github.com/goEdward/agent-skills（路径 `skills/web-access`）  
+> **AI 更新方式**：选中本 Skill 对 AI 说“按源仓库更新 `web-access`，严禁覆盖本地隐私配置”即可。
+
 联网研究、来源选择、网页读取与外部浏览器 CDP 任务的统一入口（基于上游 `eze-is/web-access v2.6.0` 选择性合并与本地增强）。
 
 ## 双端结构说明

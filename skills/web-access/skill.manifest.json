@@ -2,8 +2,16 @@
   "name": "web-access",
   "version": "2.9.1",
   "description": "Web research, fact-checking, static fetching, and authenticated external browser CDP automation for Antigravity and Codex.",
-  "agents": ["antigravity", "codex", "claude"],
-  "platforms": ["mac", "win", "linux"],
+  "agents": [
+    "antigravity",
+    "codex",
+    "claude"
+  ],
+  "platforms": [
+    "mac",
+    "win",
+    "linux"
+  ],
   "entry": "SKILL.md",
   "agentOverrides": {
     "antigravity": "agents/antigravity/SKILL.md",
@@ -14,5 +22,7 @@
     "antigravity": "agents/antigravity/rules"
   },
   "localSecretsTemplate": "templates/config.env.template",
-  "localSecretsTarget": "~/.web-access/config.env"
+  "localSecretsTarget": "~/.web-access/config.env",
+  "repository": "https://github.com/goEdward/agent-skills",
+  "sourcePath": "skills/web-access"
 }

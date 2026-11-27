@@ -1,5 +1,8 @@
 # sync-skills
 
+> **源仓库**：https://github.com/goEdward/agent-skills（路径 `skills/sync-skills`）  
+> **AI 更新方式**：选中本 Skill 对 AI 说“按源仓库更新 `sync-skills`，严禁覆盖本地隐私配置”即可。
+
 用于自检全局规则、校验规范、脱敏扫描并安全同步跨平台多 Agent 技能库到 GitHub 的独立 Skill。
 
 ## 适用范围与目录说明

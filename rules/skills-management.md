@@ -10,8 +10,8 @@ When creating, editing, or refactoring a personal reusable skill (for Antigravit
 1. **Always place skills in the GitHub skill repository** under `<skills-repo>/skills/<skill-name>/` (one self-contained folder per skill) rather than scattering files directly inside `~/.gemini/config/skills/` or `~/.codex/skills/`.
    - Locate `<skills-repo>` dynamically via the loaded `sync-skills` skill path (its enclosing Git root), `~/.gemini/config/skills.json`, or `~/.config/agent-secrets/sync-skills.env` (`SKILLS_REPO_DIR`). Never hardcode a machine-specific absolute path inside repository files.
 2. **Follow the repository folder layout**:
-   - Generic entrypoint: `<skills-repo>/skills/<skill-name>/SKILL.md` (YAML frontmatter `name` must match `<skill-name>`, `description` non-empty).
-   - Supporting files: `README.md`, `skill.manifest.json`, `scripts/` (cross-platform Python/Node), `references/`, `templates/`.
+   - Generic entrypoint: `<skills-repo>/skills/<skill-name>/SKILL.md` (YAML frontmatter `name` must match `<skill-name>`, `description` non-empty, include `metadata.repository` & `metadata.source_path` so consumers can update directly via AI).
+   - Supporting files: `README.md` (noting source repo & non-overwrite privacy policy), `skill.manifest.json` (with `repository` and `sourcePath`), `scripts/` (cross-platform Python/Node), `references/`, `templates/`.
    - Optional overrides (keep empty with `.gitkeep` when unused): `agents/{antigravity,codex,claude}/`, `platforms/{mac,win}/`.
 3. **Separate privacy and secrets from Git**:
    - Never put API keys, tokens, personal emails, real usernames/local paths, or private business data inside `<skills-repo>`.

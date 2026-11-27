@@ -2,8 +2,16 @@
   "name": "sync-skills",
   "version": "1.0.0",
   "description": "Audit, sanitize, and sync multi-platform agent skills with GitHub.",
-  "agents": ["antigravity", "codex", "claude"],
-  "platforms": ["mac", "win", "linux"],
+  "agents": [
+    "antigravity",
+    "codex",
+    "claude"
+  ],
+  "platforms": [
+    "mac",
+    "win",
+    "linux"
+  ],
   "entry": "SKILL.md",
   "agentOverrides": {
     "antigravity": "agents/antigravity/SKILL.md",
@@ -11,5 +19,7 @@
     "claude": "agents/claude/SKILL.md"
   },
   "localSecretsTemplate": "templates/config.example.env",
-  "localSecretsTarget": "~/.config/agent-secrets/sync-skills.env"
+  "localSecretsTarget": "~/.config/agent-secrets/sync-skills.env",
+  "repository": "https://github.com/goEdward/agent-skills",
+  "sourcePath": "skills/sync-skills"
 }

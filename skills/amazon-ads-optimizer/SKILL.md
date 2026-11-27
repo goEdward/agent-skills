@@ -1,6 +1,9 @@
 ---
 name: amazon-ads-optimizer
 description: Analyze Amazon Advertising Excel/CSV search-term reports for US or DE marketplaces, including daily or dual-period comparison, campaign/ad-group scoped actions, mature-product discovery, placement-aware rebuild plans, and product matching through the local private ASIN/SKU database. Use only when the user explicitly invokes /amazon-ads-optimizer, $amazon-ads-optimizer, or amazon-ads-optimizer.
+metadata:
+  repository: "https://github.com/goEdward/agent-skills"
+  source_path: "skills/amazon-ads-optimizer"
 ---
 
 # Amazon Ads Optimizer

@@ -1,5 +1,8 @@
 # amazon-ads-optimizer
 
+> **源仓库**：https://github.com/goEdward/agent-skills（路径 `skills/amazon-ads-optimizer`）  
+> **AI 更新方式**：选中本 Skill 对 AI 说“按源仓库更新 `amazon-ads-optimizer`，严禁覆盖本地隐私配置”即可。
+
 Amazon 美国站（US）与德国站（DE）广告搜索词报表分析、否定词语义安全审核与重建计划生成 Skill，一份源码同时适配 **Antigravity / Codex / Claude Code** 及 **macOS / Windows**。
 
 ## 触发方式

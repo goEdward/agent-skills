@@ -2,12 +2,22 @@
   "name": "amazon-st-search-terms",
   "version": "1.0.0",
   "description": "Amazon backend Search Terms generator with deterministic 250-byte UTF-8 fitting.",
-  "agents": ["antigravity", "codex", "claude"],
-  "platforms": ["mac", "win", "linux"],
+  "agents": [
+    "antigravity",
+    "codex",
+    "claude"
+  ],
+  "platforms": [
+    "mac",
+    "win",
+    "linux"
+  ],
   "entry": "SKILL.md",
   "agentOverrides": {
     "antigravity": "agents/antigravity/SKILL.md",
     "codex": "agents/codex/SKILL.md",
     "claude": "agents/claude/SKILL.md"
-  }
+  },
+  "repository": "https://github.com/goEdward/agent-skills",
+  "sourcePath": "skills/amazon-st-search-terms"
 }

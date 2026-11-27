@@ -2,6 +2,9 @@
 name: listing-generation
 description: >-
   为 Amazon 美国站和德国站生成符合 2026-07-27 新标题/商品亮点规则的完整 listing；仅在用户明确要求“仅迁移/只生成 Title 与 Item Highlights”等低频模式时执行旧链接字段迁移。仅在用户明确调用 /listing-generation、$listing-generation 或明确要求使用 listing-generation skill 时执行。
+metadata:
+  repository: "https://github.com/goEdward/agent-skills"
+  source_path: "skills/listing-generation"
 ---
 
 # Amazon US/DE Listing 生成

@@ -1,5 +1,8 @@
 # amazon-st-search-terms
 
+> **源仓库**：https://github.com/goEdward/agent-skills（路径 `skills/amazon-st-search-terms`）  
+> **AI 更新方式**：选中本 Skill 对 AI 说“按源仓库更新 `amazon-st-search-terms`，严禁覆盖本地隐私配置”即可。
+
 Amazon 后台 Search Terms（ST）生成与严格 250-byte 计数字节裁剪 Skill，一份源码同时适配 **Antigravity / Codex / Claude Code** 及 **macOS / Windows**。
 
 ## 触发方式

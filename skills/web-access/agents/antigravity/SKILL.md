@@ -8,6 +8,8 @@ metadata:
   author: 一泽Eze
   version: "2.9.1"
   upstream: "eze-is/web-access v2.6.0 (d173a759), selectively merged"
+  repository: "https://github.com/goEdward/agent-skills"
+  source_path: "skills/web-access"
 ---
 
 # web-access

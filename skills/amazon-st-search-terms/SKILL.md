@@ -1,6 +1,9 @@
 ---
 name: amazon-st-search-terms
 description: Manually selected only. Use only when the user explicitly selects or names /amazon-st-search-terms, $amazon-st-search-terms, or amazon-st-search-terms to generate Amazon backend Search Terms for a specified marketplace from a product title, bullet points, and pasted or exported competitor search-term data. Do not invoke implicitly for generic Amazon, SEO, listing, keyword, ST, search term, Rufus, or Cosmo requests.
+metadata:
+  repository: "https://github.com/goEdward/agent-skills"
+  source_path: "skills/amazon-st-search-terms"
 ---
 
 # Amazon ST Search Terms
