@@ -5,10 +5,11 @@ Supports macOS, Windows, and Linux using only the Python 3 standard library.
 Works regardless of which local directory the GitHub repository is cloned into.
 
 Modes:
-  - Default (maintainer): mounts all skills (including sync-skills) and maintainer global rules.
-  - --user (consumer): excludes sync-skills and maintainer rules (skills-management.md / Codex AGENTS.md),
-    while still installing per-skill runtime rules (e.g., web-access routing) for selected skills.
-  - --only a,b: mount only the specified skill names.
+  - Default (clean consumer): installs business skills only; NEVER installs sync-skills or maintainer
+    sync rules (skills-management.md / Codex AGENTS.md).
+  - --maintainer: installs all skills including sync-skills plus maintainer global sync rules.
+  - --only a,b: mount only the specified skill names (maintainer sync rules are installed ONLY if
+    sync-skills is explicitly included in --only or --maintainer is set).
   - --init-secrets: create missing local secret files from templates (STRICTLY NEVER overwrites existing files).
   - --verify [--json]: verify mounts, runtime dependencies (Python/openpyxl/Node), and local secret presence.
 """
@@ -126,10 +127,10 @@ def discover_skills() -> list[dict[str, Any]]:
 def select_skills(
     all_skills: list[dict[str, Any]],
     *,
-    user_mode: bool,
+    maintainer_mode: bool,
     only_arg: str | None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    """Filter skills according to --user and --only. Returns (selected, excluded_names)."""
+    """Filter skills according to --maintainer and --only. Default excludes sync-skills."""
     by_name = {s["name"]: s for s in all_skills}
     if only_arg:
         requested = [item.strip() for item in only_arg.split(",") if item.strip()]
@@ -140,10 +141,10 @@ def select_skills(
                 f"ERROR: Unknown skill(s) in --only: {', '.join(unknown)}. Available: {available}"
             )
         selected = [by_name[name] for name in dict.fromkeys(requested)]
-    elif user_mode:
-        selected = [s for s in all_skills if s["name"] not in MAINTAINER_ONLY_SKILLS]
-    else:
+    elif maintainer_mode:
         selected = list(all_skills)
+    else:
+        selected = [s for s in all_skills if s["name"] not in MAINTAINER_ONLY_SKILLS]
 
     selected_names = {s["name"] for s in selected}
     excluded_names = sorted(name for name in by_name if name not in selected_names)
@@ -910,9 +911,14 @@ def main() -> int:
         help="Target agent to configure (default: all)",
     )
     parser.add_argument(
+        "--maintainer",
+        action="store_true",
+        help="Maintainer mode (repo owner / fork owner): also install sync-skills and global sync rules",
+    )
+    parser.add_argument(
         "--user",
         action="store_true",
-        help="Consumer mode: exclude sync-skills and maintainer global rules (skills-management.md / Codex AGENTS.md)",
+        help="Consumer mode (now the default; kept for backwards compatibility)",
     )
     parser.add_argument(
         "--only",
@@ -939,12 +945,17 @@ def main() -> int:
         print_status(all_skills, as_json=args.json)
         return 0
 
+    maintainer_mode = bool(args.maintainer and not args.user)
     selected_skills, excluded_names = select_skills(
-        all_skills, user_mode=args.user, only_arg=args.only
+        all_skills, maintainer_mode=maintainer_mode, only_arg=args.only
     )
+    selected_names = {s["name"] for s in selected_skills}
+    include_maintainer_rules = maintainer_mode or ("sync-skills" in selected_names)
 
     if args.verify:
-        result = run_verify(selected_skills, agent=args.agent, user_mode=args.user)
+        result = run_verify(
+            selected_skills, agent=args.agent, user_mode=not include_maintainer_rules
+        )
         if args.json:
             print(json.dumps(result, ensure_ascii=False, indent=2))
         else:
@@ -966,7 +977,7 @@ def main() -> int:
 
     quiet = args.json
     summary: dict[str, Any] = {
-        "mode": "user" if args.user else "maintainer",
+        "mode": "maintainer" if include_maintainer_rules else "user",
         "dryRun": args.dry_run,
         "selectedSkills": [s["name"] for s in selected_skills],
         "excludedSkills": excluded_names,
@@ -1003,7 +1014,6 @@ def main() -> int:
             )
 
     if not args.no_rules:
-        include_maintainer_rules = not args.user
         if args.agent in ("all", "antigravity"):
             summary["antigravityRules"] = sync_antigravity_rules(
                 selected_skills,

@@ -34,4 +34,4 @@
 
 ## 4. 新增或删除 Skill 后的挂载刷新
 
-- 新增、重命名或删除 Skill，或更新 `rules/skills-management.md` 后，运行 `python3 <repo>/setup.py` 刷新本机 Antigravity / Codex 挂载与全局规则。
+- 新增、重命名或删除 Skill，或更新 `rules/skills-management.md` 后，维护者运行 `python3 <repo>/setup.py --maintainer` 刷新本机 Antigravity / Codex 挂载与同步规则（普通使用者默认运行 `python3 <repo>/setup.py` 即可，不装维护者同步规则）。

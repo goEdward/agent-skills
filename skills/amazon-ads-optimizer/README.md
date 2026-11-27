@@ -19,7 +19,7 @@ Amazon 美国站（US）与德国站（DE）广告搜索词报表分析、否定
 - **Windows**：`%USERPROFILE%\.config\agent-secrets\amazon-ads-optimizer\products.json`
 - 也支持通过环境变量 `AMAZON_ADS_PRODUCT_DB` 或命令行 `--product-db` 指定路径。
 
-新设备初始化时，可运行仓库根目录的 `python3 setup.py --user --only amazon-ads-optimizer --init-secrets`（仅在目标文件**不存在**时由 `templates/products.example.json` 创建），随后填入真实产品数据或从个人加密备份恢复。
+新设备初始化时，可运行仓库根目录的 `python3 setup.py --only amazon-ads-optimizer --init-secrets`（仅在目标文件**不存在**时由 `templates/products.example.json` 创建），随后填入真实产品数据或从个人加密备份恢复。
 
 > **⚠️ 更新安全声明**：`git pull` 与 `setup.py`（含 `--init-secrets`）**绝不会覆盖已存在的本地 `products.json`**。AI 协助更新时也严禁以模板覆盖该文件。
 

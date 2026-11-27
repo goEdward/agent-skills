@@ -460,12 +460,12 @@ def run_doctor(repo: Path, local_env: dict[str, str]) -> dict[str, Any]:
         if codex_rule_status != "ok":
             issues.append(f"Codex global rule block in ~/.codex/AGENTS.md is {codex_rule_status}")
 
-    # Integrate setup.py --verify --json if available
+    # Integrate setup.py --maintainer --verify --json if available
     setup_verify: dict[str, Any] | None = None
     setup_script = repo / "setup.py"
     if setup_script.is_file():
         vproc = subprocess.run(
-            [sys.executable, str(setup_script), "--verify", "--json"],
+            [sys.executable, str(setup_script), "--maintainer", "--verify", "--json"],
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -514,9 +514,9 @@ def run_doctor(repo: Path, local_env: dict[str, str]) -> dict[str, Any]:
         "issues": issues,
         "notices": notices,
         "fixCommand": (
-            f"python3 {repo / 'setup.py'}"
+            f"python3 {repo / 'setup.py'} --maintainer"
             if platform.system() != "Windows"
-            else f"python {repo / 'setup.py'}"
+            else f"python {repo / 'setup.py'} --maintainer"
         ),
     }
 
@@ -947,8 +947,8 @@ def cmd_pull(repo: Path, refresh_setup: bool, user_mode: bool) -> int:
         setup_script = repo / "setup.py"
         if setup_script.is_file():
             cmd = [sys.executable, str(setup_script)]
-            if user_mode:
-                cmd.append("--user")
+            if not user_mode:
+                cmd.append("--maintainer")
             print("Refreshing local agent mounts via setup.py ...")
             setup_res = subprocess.run(cmd)
             if setup_res.returncode != 0:

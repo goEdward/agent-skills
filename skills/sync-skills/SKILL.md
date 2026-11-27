@@ -31,7 +31,7 @@ python3 <skill-dir>/scripts/sync_tool.py doctor
 3. **本机挂载与运行时依赖**：各 Skill 挂载是否有效、Python/Node/`openpyxl` 与本地隐私文件状态；
 4. **本地脱敏配置提醒**：`~/.config/agent-secrets/sync-skills.env` 是否已配置自定义敏感词。
 
-若检测到缺失全局规则或挂载未完成，告知用户并经同意后运行 `python3 <repo>/setup.py` 自动补齐。
+若检测到缺失全局规则或挂载未完成，告知用户并经同意后运行 `python3 <repo>/setup.py --maintainer` 自动补齐。
 
 ## 场景 A：推送本地 Skill 修改到 GitHub（默认流程）
 
@@ -69,7 +69,7 @@ python3 <skill-dir>/scripts/sync_tool.py commit-push -m "<commit-message>"
 ```
 - 脚本内置安检 + 测试门禁 + `pull --rebase` + `push`，遇 TLS/HTTP2 抖动会自动回退 `HTTP/1.1` 重试；
 - 若 `pull --rebase` 遇到冲突，严禁 `--force`，停止并协助合并；
-- 如涉及新增/删除 Skill、规则变更或 `agents/<agent>/SKILL.md` 变更，运行 `python3 <repo>/setup.py` 刷新本机挂载。
+- 如涉及新增/删除 Skill、规则变更或 `agents/<agent>/SKILL.md` 变更，运行 `python3 <repo>/setup.py --maintainer` 刷新本机挂载。
 
 ## 场景 B：从 GitHub 拉取最新 Skill 到本机（严禁覆盖本地隐私文件）
 

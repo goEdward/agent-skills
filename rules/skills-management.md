@@ -17,5 +17,5 @@ When creating, editing, or refactoring a personal reusable skill (for Antigravit
    - Never put API keys, tokens, personal emails, real usernames/local paths, or private business data inside `<skills-repo>`.
    - Put only field templates in `<skills-repo>/skills/<skill-name>/templates/config.example.env`, and instruct users/scripts to read real values from `~/.config/agent-secrets/<skill-name>.env` (outside the Git repository).
 4. **Refresh mounts and prompt to sync**:
-   - After adding or renaming a skill (or adding an agent override), run `python3 <skills-repo>/setup.py` (or `python <skills-repo>\setup.py` on Windows) so local agents pick it up immediately.
+   - After adding or renaming a skill (or adding an agent override), run `python3 <skills-repo>/setup.py --maintainer` (or `python <skills-repo>\setup.py --maintainer` on Windows) so local agents pick it up immediately.
    - After finishing skill edits, ask the user whether to run `sync-skills` to audit privacy and push updates to GitHub (never push silently without confirmation).
